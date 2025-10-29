@@ -259,8 +259,8 @@ class TransactionsModule {
 
         return {
             id: transactionResult.id,
-            wait: async () =>
-                await this.waitForTransaction(transactionResult.id)
+            wait: async (options?: WaitForTransactionOptions) =>
+                await this.waitForTransaction(transactionResult.id, options)
         };
     }
 
@@ -293,7 +293,7 @@ class TransactionsModule {
      *
      * @param txID - The transaction ID of the transaction to wait for.
      * @param options - Optional parameters for the request. Includes the timeout and interval between requests.
-     *                  Both parameters are in milliseconds. If the timeout is not specified, the request will not time out!
+     *                  Both parameters are in milliseconds. If the timeout is not specified, defaults to 60000ms (60 seconds).
      * @returns A promise that resolves to the transaction receipt of the transaction. If the transaction is not included in a block before the timeout,
      *          the promise will resolve to `null`.
      * @throws {InvalidDataType}
@@ -311,22 +311,13 @@ class TransactionsModule {
             );
         }
 
-        // If no timeout is specified, use the original polling behavior
-        if (options?.timeoutMs === undefined) {
-            return await Poll.SyncPoll(
-                async () => await this.getTransactionReceipt(txID),
-                {
-                    requestIntervalInMilliseconds: options?.intervalMs,
-                    maximumWaitingTimeInMilliseconds: options?.timeoutMs
-                }
-            ).waitUntil((result) => {
-                return result !== null;
-            });
-        }
-
-        const startTime = Date.now();
-        const deadline = startTime + options.timeoutMs;
+        // Default timeout to 60 seconds if not specified
+        const timeoutMs = options?.timeoutMs ?? 60000;
         const intervalMs = options?.intervalMs ?? 1000;
+        
+        const startTime = Date.now();
+        const deadline = startTime + timeoutMs;
+        
         while (true) {
             // Check if timeout has been reached
             if (Date.now() >= deadline) {
@@ -1111,7 +1102,7 @@ class TransactionsModule {
 
         return {
             id,
-            wait: async () => await this.waitForTransaction(id)
+            wait: async (options?: WaitForTransactionOptions) => await this.waitForTransaction(id, options)
         };
     }
 
@@ -1160,7 +1151,7 @@ class TransactionsModule {
 
         return {
             id,
-            wait: async () => await this.waitForTransaction(id)
+            wait: async (options?: WaitForTransactionOptions) => await this.waitForTransaction(id, options)
         };
     }
 

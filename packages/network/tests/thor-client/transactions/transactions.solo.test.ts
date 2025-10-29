@@ -118,6 +118,69 @@ describe('ThorClient - Transactions Module', () => {
         });
 
         /**
+         * Test wait() method with custom timeout options
+         */
+        test('Should wait for transaction with custom timeout options using wait() method', async () => {
+            // Estimate the gas required for the transfer transaction
+            const gasResult = await retryOperation(
+                async () =>
+                    await thorSoloClient.transactions.estimateGas(
+                        [transfer1VTHOClause],
+                        TEST_ACCOUNTS.TRANSACTION.TRANSACTION_SENDER.address
+                    )
+            );
+
+            const nonce = 20000001; // unique nonce for this test
+
+            const txBody =
+                await thorSoloClient.transactions.buildTransactionBody(
+                    [transfer1VTHOClause],
+                    gasResult.totalGas,
+                    { nonce }
+                );
+
+            const tx = Transaction.of(txBody).sign(
+                HexUInt.of(
+                    TEST_ACCOUNTS.TRANSACTION.TRANSACTION_SENDER.privateKey
+                ).bytes
+            );
+
+            const sendTransactionResult =
+                await thorSoloClient.transactions.sendTransaction(tx);
+
+            expect(sendTransactionResult).toBeDefined();
+            expect(sendTransactionResult.id).toBeDefined();
+
+            // Test wait() with custom options
+            const txReceipt = await sendTransactionResult.wait({
+                timeoutMs: 10000,
+                intervalMs: 500
+            });
+
+            expect(txReceipt).toBeDefined();
+            expect(txReceipt?.reverted).toBe(expectedReceipt.reverted);
+        }, 15000);
+
+        /**
+         * Test wait() method with default timeout (should timeout after 60 seconds)
+         */
+        test('Should timeout with default 60s when transaction cannot be found', async () => {
+            // Use a fake transaction ID that will never be found
+            const fakeTransactionId = '0x0000000000000000000000000000000000000000000000000000000000000001';
+            
+            const startTime = Date.now();
+            const txReceipt = await thorSoloClient.transactions.waitForTransaction(
+                fakeTransactionId,
+                { timeoutMs: 100, intervalMs: 10 } // Very short timeout for testing
+            );
+            const elapsedTime = Date.now() - startTime;
+            
+            expect(txReceipt).toBeNull();
+            expect(elapsedTime).toBeGreaterThanOrEqual(100);
+            expect(elapsedTime).toBeLessThan(200);
+        }, 1000);
+
+        /**
          * test that send transaction with a number as value in transaction body
          */
         test('test a send transaction with a number as value in transaction body ', async () => {
